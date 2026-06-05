@@ -1,55 +1,78 @@
-var CACHE_NAME = 'ocr-app-v2';
-var ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon.svg',
-  './icon-192.png',
-  './icon-512.png',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
-  'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+"use strict";
+
+var CACHE_NAME = "ocr-app-v5";
+var APP_SHELL = [
+  "./",
+  "./index.html",
+  "./styles.css",
+  "./app.js?v=server-required-20260605",
+  "./manifest.json",
+  "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./vendor/pdf.min.js",
+  "./vendor/pdf.worker.min.js"
 ];
 
-self.addEventListener('install', function(e) {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(ASSETS);
+self.addEventListener("install", function (event) {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(function (cache) {
+      return cache.addAll(APP_SHELL);
     })
   );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', function(e) {
-  e.waitUntil(
-    caches.keys().then(function(names) {
+self.addEventListener("activate", function (event) {
+  event.waitUntil(
+    caches.keys().then(function (names) {
       return Promise.all(
-        names.filter(function(n) { return n !== CACHE_NAME; })
-             .map(function(n) { return caches.delete(n); })
+        names.filter(function (name) {
+          return name !== CACHE_NAME;
+        }).map(function (name) {
+          return caches.delete(name);
+        })
       );
     })
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', function(e) {
-  if (e.request.url.includes('api.mistral.ai')) return;
+self.addEventListener("fetch", function (event) {
+  var request = event.request;
+  var url = new URL(request.url);
 
-  e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      var fetchPromise = fetch(e.request).then(function(response) {
+  if (request.method !== "GET") {
+    return;
+  }
+
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request).catch(function () {
+        return caches.match("./index.html");
+      })
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then(function (cached) {
+      var fetchPromise = fetch(request).then(function (response) {
         if (response && response.status === 200) {
           var clone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(e.request, clone);
+          caches.open(CACHE_NAME).then(function (cache) {
+            cache.put(request, clone);
           });
         }
         return response;
-      }).catch(function() {
+      }).catch(function () {
         return cached;
       });
+
       return cached || fetchPromise;
     })
   );

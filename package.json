@@ -1,0 +1,14 @@
+{
+  "name": "mistral-ocr-arabic-web-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Arabic-friendly OCR web app with a server-side Mistral OCR proxy.",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
