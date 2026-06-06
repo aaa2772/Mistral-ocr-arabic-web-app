@@ -12,12 +12,15 @@
     "image/jpeg",
     "image/webp",
     "image/bmp",
-    "image/tiff"
+    "image/tiff",
+    "image/avif"
   ]);
   const RECENT_KEY = "recent_scans";
   const MAX_RECENT = 10;
   const MAX_RENDERED_TABLES = 6;
+  const MAX_RENDERED_IMAGES = 8;
   const MAX_LOW_CONFIDENCE_WORDS = 8;
+  const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
   const state = {
     currentFile: null,
@@ -61,6 +64,7 @@
       "nextPageBtn",
       "editorContent",
       "downloadBtn",
+      "downloadWordBtn",
       "printBtn",
       "linkBtn",
       "scanList",
@@ -69,10 +73,15 @@
       "pagesInput",
       "tableFormatSelect",
       "confidenceSelect",
+      "extractHeaderToggle",
+      "extractFooterToggle",
+      "imageModeSelect",
       "resultDetails",
       "resultSummary",
       "confidenceDetails",
-      "tableDetails"
+      "tableDetails",
+      "structureDetails",
+      "imageDetails"
     ].forEach(function (id) {
       els[id] = document.getElementById(id);
     });
@@ -121,6 +130,7 @@
     els.prevPageBtn.addEventListener("click", prevPage);
     els.nextPageBtn.addEventListener("click", nextPage);
     els.downloadBtn.addEventListener("click", downloadText);
+    els.downloadWordBtn.addEventListener("click", downloadWordDocument);
     els.printBtn.addEventListener("click", printText);
     els.linkBtn.addEventListener("click", addLink);
     els.clearHistoryBtn.addEventListener("click", clearRecentScans);
@@ -147,7 +157,7 @@
     }
 
     if (!VALID_TYPES.has(file.type)) {
-      showToast("نوع الملف غير مدعوم. استخدم PDF أو PNG أو JPG أو WEBP أو BMP أو TIFF.", "error");
+      showToast("نوع الملف غير مدعوم. استخدم PDF أو PNG أو JPG أو WEBP أو BMP أو TIFF أو AVIF.", "error");
       resetFileInputs();
       return;
     }
@@ -182,6 +192,9 @@
       formData.append("pages", els.pagesInput.value.trim());
       formData.append("tableFormat", els.tableFormatSelect.value);
       formData.append("confidence", els.confidenceSelect.value);
+      formData.append("extractHeader", els.extractHeaderToggle.checked ? "true" : "false");
+      formData.append("extractFooter", els.extractFooterToggle.checked ? "true" : "false");
+      formData.append("imageMode", els.imageModeSelect.value);
 
       const response = await fetch("/api/ocr", {
         method: "POST",
@@ -367,21 +380,29 @@
     els.resultSummary.replaceChildren();
     els.confidenceDetails.replaceChildren();
     els.tableDetails.replaceChildren();
+    els.structureDetails.replaceChildren();
+    els.imageDetails.replaceChildren();
   }
 
   function renderResultMetadata(data) {
     const pages = Array.isArray(data.pages) ? data.pages : [];
     const tables = collectTables(data);
     const confidenceRows = collectConfidenceScores(pages);
+    const structures = collectPageStructures(pages);
+    const images = collectImages(data);
 
     els.resultSummary.replaceChildren(
       createSummaryMetric("الصفحات", String(pages.length), "عدد الصفحات التي عالجها OCR"),
       createSummaryMetric("الجداول", String(tables.length), tables.length ? "جداول منفصلة رجعت من Mistral" : "لا توجد جداول منفصلة"),
+      createSummaryMetric("الترويسة/التذييل", String(structures.length), structures.length ? "تم فصل بنية الصفحات" : "لم ترجع بنية منفصلة"),
+      createSummaryMetric("الصور", String(images.length), images.length ? "عناصر مرئية رجعت من Mistral" : "لم ترجع صور منفصلة"),
       createSummaryMetric("الثقة", confidenceRows.length ? "متاحة" : "غير متاحة", confidenceRows.length ? "تم عرض درجات الثقة أدناه" : "اختر مستوى الثقة قبل الرفع لعرضها")
     );
 
     renderConfidenceDetails(confidenceRows);
     renderTableDetails(tables);
+    renderStructureDetails(structures);
+    renderImageDetails(images);
     els.resultDetails.hidden = false;
   }
 
@@ -428,6 +449,80 @@
     }
 
     return tables;
+  }
+
+  function collectPageStructures(pages) {
+    const rows = [];
+    pages.forEach(function (page, index) {
+      if (!page || typeof page !== "object") {
+        return;
+      }
+
+      const header = readTextValue(page.header);
+      const footer = readTextValue(page.footer);
+      if (!header && !footer) {
+        return;
+      }
+
+      rows.push({
+        page: Number.isFinite(Number(page.index)) ? Number(page.index) + 1 : index + 1,
+        header: header,
+        footer: footer
+      });
+    });
+    return rows;
+  }
+
+  function readTextValue(value) {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  function collectImages(data) {
+    const images = [];
+    const pages = Array.isArray(data.pages) ? data.pages : [];
+
+    addImages(data.images, null);
+    pages.forEach(function (page, index) {
+      addImages(page && page.images, index + 1);
+    });
+
+    function addImages(source, pageNumber) {
+      if (!Array.isArray(source)) {
+        return;
+      }
+
+      source.forEach(function (image, index) {
+        const normalized = normalizeImage(image, pageNumber, index + 1);
+        if (normalized) {
+          images.push(normalized);
+        }
+      });
+    }
+
+    return images;
+  }
+
+  function normalizeImage(image, pageNumber, position) {
+    const title = pageNumber ? "صفحة " + pageNumber + " · صورة " + position : "صورة " + position;
+
+    if (typeof image === "string") {
+      return { title: title, description: image, src: "" };
+    }
+
+    if (!image || typeof image !== "object") {
+      return null;
+    }
+
+    return {
+      title: readTextValue(image.id) || readTextValue(image.name) || readTextValue(image.title) || title,
+      description: readTextValue(image.short_description) || readTextValue(image.description) || readTextValue(image.summary) || "",
+      src: readSafeDataImage(image.image_base64 || image.imageBase64 || image.base64 || "")
+    };
+  }
+
+  function readSafeDataImage(value) {
+    const src = String(value || "");
+    return /^data:image\/(?:png|jpe?g|webp|gif|bmp|tiff|avif);base64,[A-Za-z0-9+/=\s]+$/.test(src) ? src : "";
   }
 
   function normalizeTable(table, pageNumber, position) {
@@ -605,6 +700,92 @@
 
     if (tables.length > MAX_RENDERED_TABLES) {
       els.tableDetails.appendChild(createDetailEmpty("تم عرض أول " + MAX_RENDERED_TABLES + " جداول فقط لتجنب ازدحام الواجهة."));
+    }
+  }
+
+  function renderStructureDetails(structures) {
+    els.structureDetails.replaceChildren();
+    els.structureDetails.appendChild(createDetailTitle("الترويسة والتذييل", structures.length ? structures.length + " صفحة فيها بنية منفصلة" : "لم ترجع بنية منفصلة"));
+
+    if (!structures.length) {
+      els.structureDetails.appendChild(createDetailEmpty("فعّل استخراج الترويسة أو التذييل قبل الرفع إذا كان المستند يحتوي نصا متكررا أعلى أو أسفل الصفحات."));
+      return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "structure-list";
+
+    structures.forEach(function (row) {
+      const item = document.createElement("article");
+      item.className = "structure-item";
+
+      const heading = document.createElement("h3");
+      heading.textContent = "صفحة " + row.page;
+      item.appendChild(heading);
+
+      if (row.header) {
+        item.appendChild(createStructureBlock("الترويسة", row.header));
+      }
+      if (row.footer) {
+        item.appendChild(createStructureBlock("التذييل", row.footer));
+      }
+
+      list.appendChild(item);
+    });
+
+    els.structureDetails.appendChild(list);
+  }
+
+  function createStructureBlock(label, text) {
+    const block = document.createElement("div");
+    block.className = "structure-block";
+    const title = document.createElement("strong");
+    title.textContent = label;
+    const content = document.createElement("p");
+    content.textContent = text;
+    block.appendChild(title);
+    block.appendChild(content);
+    return block;
+  }
+
+  function renderImageDetails(images) {
+    els.imageDetails.replaceChildren();
+    els.imageDetails.appendChild(createDetailTitle("الصور", images.length ? images.length + " عنصر مرئي" : "لم ترجع صور منفصلة"));
+
+    if (!images.length) {
+      els.imageDetails.appendChild(createDetailEmpty("اختر استخراج الصور المهمة قبل الرفع إذا كنت تريد فحص الرسوم أو المخططات التي يكتشفها OCR."));
+      return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "image-result-list";
+
+    images.slice(0, MAX_RENDERED_IMAGES).forEach(function (image) {
+      const item = document.createElement("article");
+      item.className = "image-result-item";
+
+      if (image.src) {
+        const img = document.createElement("img");
+        img.src = image.src;
+        img.alt = image.description || image.title;
+        item.appendChild(img);
+      }
+
+      const body = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = image.title;
+      const description = document.createElement("p");
+      description.textContent = image.description || "عنصر مرئي رجع من OCR بدون وصف إضافي.";
+      body.appendChild(title);
+      body.appendChild(description);
+      item.appendChild(body);
+      list.appendChild(item);
+    });
+
+    els.imageDetails.appendChild(list);
+
+    if (images.length > MAX_RENDERED_IMAGES) {
+      els.imageDetails.appendChild(createDetailEmpty("تم عرض أول " + MAX_RENDERED_IMAGES + " عناصر فقط لتجنب ازدحام الواجهة."));
     }
   }
 
@@ -966,6 +1147,210 @@
       a.remove();
     }, 1000);
     showToast("بدأ تنزيل الملف. إذا لم يظهر الملف داخل متصفح Codex، افتح التطبيق في Chrome أو Safari.", "info");
+  }
+
+  async function downloadWordDocument() {
+    normalizeEditorLinks();
+    const payload = buildDocxExportPayload();
+    if (!payload.blocks.length) {
+      showToast("لا يوجد نص لتنزيله كملف Word.", "error");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/export/docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+
+      const blob = await response.blob();
+      await saveBlob(blob, payload.filename, DOCX_MIME_TYPE, [".docx"], "Word document");
+      showToast("تم تجهيز ملف Word.", "success");
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        return;
+      }
+      showToast(error.message || "تعذر تنزيل ملف Word.", "error");
+    }
+  }
+
+  function buildDocxExportPayload() {
+    const text = els.editorContent.innerText || "";
+    return {
+      filename: getDownloadBaseName() + ".docx",
+      direction: detectTextDirection(text),
+      blocks: buildDocxBlocks(els.editorContent)
+    };
+  }
+
+  function getDownloadBaseName() {
+    return state.currentFile ? state.currentFile.name.replace(/\.[^.]+$/, "") : "ocr-result";
+  }
+
+  function detectTextDirection(text) {
+    return /[\u0590-\u08ff]/.test(text || "") ? "rtl" : "ltr";
+  }
+
+  function buildDocxBlocks(root) {
+    const blocks = [];
+    Array.from(root.childNodes).forEach(function (node) {
+      appendDocxBlocksForNode(blocks, node);
+    });
+    return blocks;
+  }
+
+  function appendDocxBlocksForNode(blocks, node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const runs = collectInlineRuns(node, {});
+      if (runs.length) {
+        blocks.push({ type: "paragraph", runs: runs });
+      }
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return;
+    }
+
+    const tag = node.tagName;
+    if (tag === "HR") {
+      blocks.push({ type: "pageBreak" });
+      return;
+    }
+
+    if (/^H[1-3]$/.test(tag)) {
+      const runs = collectInlineRuns(node, {});
+      if (runs.length) {
+        blocks.push({ type: "heading", level: Number(tag.slice(1)), runs: runs });
+      }
+      return;
+    }
+
+    if (tag === "UL" || tag === "OL") {
+      const items = Array.from(node.children).filter(function (child) {
+        return child.tagName === "LI";
+      }).map(function (item) {
+        return collectInlineRuns(item, {});
+      }).filter(function (runs) {
+        return runs.length;
+      });
+
+      if (items.length) {
+        blocks.push({ type: "list", ordered: tag === "OL", items: items });
+      }
+      return;
+    }
+
+    if (tag === "TABLE") {
+      const rows = Array.from(node.querySelectorAll("tr")).map(function (row) {
+        return Array.from(row.children).filter(function (cell) {
+          return cell.tagName === "TH" || cell.tagName === "TD";
+        }).map(function (cell) {
+          return collectInlineRuns(cell, {});
+        });
+      }).filter(function (row) {
+        return row.length;
+      });
+
+      if (rows.length) {
+        blocks.push({ type: "table", rows: rows });
+      }
+      return;
+    }
+
+    if (["P", "DIV", "PRE", "BLOCKQUOTE"].includes(tag)) {
+      const runs = collectInlineRuns(node, tag === "PRE" ? { code: true } : {});
+      if (runs.length) {
+        blocks.push({ type: "paragraph", runs: runs });
+      }
+      return;
+    }
+
+    const fallbackRuns = collectInlineRuns(node, {});
+    if (fallbackRuns.length) {
+      blocks.push({ type: "paragraph", runs: fallbackRuns });
+    }
+  }
+
+  function collectInlineRuns(node, style) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = (node.nodeValue || "").replace(/\s+/g, " ");
+      return text.trim() ? [Object.assign({ text: text }, style)] : [];
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return [];
+    }
+
+    if (node.tagName === "BR") {
+      return [{ text: " " }];
+    }
+
+    const nextStyle = Object.assign({}, style);
+    if (node.tagName === "B" || node.tagName === "STRONG") {
+      nextStyle.bold = true;
+    }
+    if (node.tagName === "I" || node.tagName === "EM") {
+      nextStyle.italic = true;
+    }
+    if (node.tagName === "U") {
+      nextStyle.underline = true;
+    }
+    if (node.tagName === "CODE") {
+      nextStyle.code = true;
+    }
+    if (node.tagName === "A") {
+      const href = sanitizeUrl(node.getAttribute("href") || "");
+      if (href) {
+        nextStyle.href = href;
+      }
+    }
+
+    return Array.from(node.childNodes).flatMap(function (child) {
+      return collectInlineRuns(child, nextStyle);
+    });
+  }
+
+  async function saveBlob(blob, name, mimeType, extensions, description) {
+    const typedBlob = blob.type === mimeType ? blob : new Blob([blob], { type: mimeType });
+
+    if (typeof window.showSaveFilePicker === "function") {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: name,
+          types: [{
+            description: description,
+            accept: Object.fromEntries([[mimeType, extensions]])
+          }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(typedBlob);
+        await writable.close();
+        return;
+      } catch (error) {
+        if (error && error.name === "AbortError") {
+          throw error;
+        }
+      }
+    }
+
+    const objectUrl = URL.createObjectURL(typedBlob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = name;
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    window.setTimeout(function () {
+      URL.revokeObjectURL(objectUrl);
+      a.remove();
+    }, 1000);
   }
 
   function printText() {

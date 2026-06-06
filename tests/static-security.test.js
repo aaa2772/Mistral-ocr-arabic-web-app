@@ -38,11 +38,40 @@ test("results UI exposes metadata panels for OCR quality signals", function () {
   assert.equal(html.includes("id=\"resultSummary\""), true);
   assert.equal(html.includes("id=\"confidenceDetails\""), true);
   assert.equal(html.includes("id=\"tableDetails\""), true);
+  assert.equal(html.includes("id=\"structureDetails\""), true);
+  assert.equal(html.includes("id=\"imageDetails\""), true);
   assert.equal(html.includes("field-hint"), true);
   assert.equal(app.includes("renderResultMetadata"), true);
   assert.equal(app.includes("renderConfidenceDetails"), true);
   assert.equal(app.includes("renderTableDetails"), true);
+  assert.equal(app.includes("renderStructureDetails"), true);
+  assert.equal(app.includes("renderImageDetails"), true);
   assert.equal(app.includes("DOMParser"), true);
+});
+
+test("advanced OCR controls are present and submitted to the API", function () {
+  const app = read("app.js");
+  const html = read("index.html");
+
+  assert.equal(html.includes("id=\"advancedOptions\""), true);
+  assert.equal(html.includes("id=\"extractHeaderToggle\""), true);
+  assert.equal(html.includes("id=\"extractFooterToggle\""), true);
+  assert.equal(html.includes("id=\"imageModeSelect\""), true);
+  assert.equal(app.includes("formData.append(\"extractHeader\""), true);
+  assert.equal(app.includes("formData.append(\"extractFooter\""), true);
+  assert.equal(app.includes("formData.append(\"imageMode\""), true);
+});
+
+test("Word export UI is present and posts sanitized blocks to the same-origin endpoint", function () {
+  const app = read("app.js");
+  const html = read("index.html");
+
+  assert.equal(html.includes("id=\"downloadWordBtn\""), true);
+  assert.equal(html.includes("تنزيل Word"), true);
+  assert.equal(app.includes("downloadWordDocument"), true);
+  assert.equal(app.includes("buildDocxExportPayload"), true);
+  assert.equal(app.includes("fetch(\"/api/export/docx\""), true);
+  assert.equal(app.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document"), true);
 });
 
 test("file protocol guidance is not tied to a temporary development port", function () {

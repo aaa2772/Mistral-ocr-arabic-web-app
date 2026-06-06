@@ -31,8 +31,9 @@ http://localhost:3000
 ## Security notes
 
 - OCR requests go through `POST /api/ocr`; the browser never receives the Mistral API key.
+- Word export requests go through `POST /api/export/docx` and convert the current sanitized editor content into a `.docx` file without calling Mistral again.
 - The server accepts one uploaded file named `file`, with a 50MB maximum.
-- Supported types: PDF, PNG, JPG/JPEG, WEBP, BMP, and TIFF.
+- Supported types: PDF, PNG, JPG/JPEG, WEBP, BMP, TIFF, and AVIF.
 - OCR Markdown is rendered with a small safe renderer that does not execute raw HTML.
 - Recent history stores only file name, date, and page count. It does not store extracted OCR text.
 - The app sets a strict Content Security Policy and self-hosts PDF.js assets.
@@ -44,8 +45,16 @@ http://localhost:3000
 - `pages`: optional, user-facing 1-based pages such as `1,3-5`; the server converts them to the Mistral API's 0-based page indexes.
 - `tableFormat`: optional `markdown` or `html`.
 - `confidence`: optional `page` or `word`.
+- `extractHeader`: optional `true`; separates page headers into `page.header` when Mistral returns them.
+- `extractFooter`: optional `true`; separates page footers into `page.footer` when Mistral returns them.
+- `imageMode`: optional `important`; keeps image extraction off by default, or sends `include_image_base64: true`, `image_limit: 8`, and `image_min_size: 256` when users need charts or figures.
 
-When Mistral returns separate table or confidence metadata, the app shows it in the result details panel below the editable OCR text.
+When Mistral returns separate table, confidence, header/footer, or image metadata, the app shows it in the result details panel below the editable OCR text.
+
+## Downloads
+
+- TXT export downloads the plain editable text.
+- Word export downloads a `.docx` file generated from the current editor content, preserving headings, paragraphs, lists, tables, safe links, and RTL Arabic alignment.
 
 ## Tests
 

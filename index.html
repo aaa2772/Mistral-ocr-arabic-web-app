@@ -13,9 +13,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="OCR App">
-<link rel="stylesheet" href="styles.css?v=dubai-font-20260606">
+<link rel="stylesheet" href="styles.css?v=docx-export-20260606">
 <script src="vendor/pdf.min.js"></script>
-<script src="app.js?v=metadata-ui-20260606" defer></script>
+<script src="app.js?v=docx-export-20260606" defer></script>
 </head>
 <body>
 <header class="header">
@@ -45,9 +45,9 @@
         </svg>
       </div>
       <h2 id="uploadTitle">ارفع ملفا أو اسحبه هنا</h2>
-      <p>PDF أو PNG أو JPG أو WEBP أو BMP أو TIFF، بحد أقصى 50MB.</p>
+      <p>PDF أو PNG أو JPG أو WEBP أو BMP أو TIFF أو AVIF، بحد أقصى 50MB.</p>
     </div>
-    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tiff">
+    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.avif">
     <input type="file" id="cameraInput" accept="image/*" capture="environment">
   </section>
 
@@ -82,6 +82,33 @@
       </select>
       <span class="field-hint" id="confidenceHint">مستوى الكلمة أدق لكنه يزيد حجم الاستجابة.</span>
     </label>
+    <details class="advanced-options" id="advancedOptions">
+      <summary>خيارات متقدمة</summary>
+      <div class="advanced-grid">
+        <label class="toggle-field">
+          <input id="extractHeaderToggle" type="checkbox">
+          <span>
+            <strong>استخراج الترويسة</strong>
+            <small>يفصل الهيدر في نتيجة مستقلة عند توفره.</small>
+          </span>
+        </label>
+        <label class="toggle-field">
+          <input id="extractFooterToggle" type="checkbox">
+          <span>
+            <strong>استخراج التذييل</strong>
+            <small>يفصل الفوتر عن النص الرئيسي عند توفره.</small>
+          </span>
+        </label>
+        <label>
+          <span class="field-label">الصور المهمة</span>
+          <select id="imageModeSelect" aria-describedby="imageModeHint">
+            <option value="none">بدون</option>
+            <option value="important">استخراج الصور المهمة</option>
+          </select>
+          <span class="field-hint" id="imageModeHint">يزيد حجم الاستجابة؛ استخدمه للمخططات والرسوم.</span>
+        </label>
+      </div>
+    </details>
   </section>
 
   <section class="processing-section" id="processingSection" aria-live="polite">
@@ -145,6 +172,13 @@
           <button class="icon-btn" id="downloadBtn" type="button" title="تنزيل النص" aria-label="تنزيل النص">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
           </button>
+          <button class="icon-btn" id="downloadWordBtn" type="button" title="تنزيل Word" aria-label="تنزيل Word">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 3h8l4 4v14H6z"></path>
+              <path d="M14 3v4h4"></path>
+              <path d="M9 11l1.2 6 1.8-4 1.8 4 1.2-6"></path>
+            </svg>
+          </button>
           <button class="icon-btn" id="printBtn" type="button" title="طباعة" aria-label="طباعة">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5"></path><path d="M7 17H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2"></path><path d="M7 14h10v7H7z"></path></svg>
           </button>
@@ -157,6 +191,8 @@
       <div class="detail-grid">
         <section class="detail-panel" id="confidenceDetails" aria-label="تفاصيل الثقة"></section>
         <section class="detail-panel" id="tableDetails" aria-label="الجداول المستخرجة"></section>
+        <section class="detail-panel" id="structureDetails" aria-label="الترويسة والتذييل"></section>
+        <section class="detail-panel" id="imageDetails" aria-label="الصور والعناصر المرئية"></section>
       </div>
     </section>
   </section>
