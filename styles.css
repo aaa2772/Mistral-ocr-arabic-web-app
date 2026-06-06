@@ -13,6 +13,54 @@
   --radius: 10px;
 }
 
+@font-face {
+  font-family: "Dubai";
+  src: local("Dubai Light"), local("Dubai"), url("fonts/DubaiW23-Light.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 300;
+}
+
+@font-face {
+  font-family: "Dubai";
+  src: local("Dubai Regular"), local("Dubai"), url("fonts/DubaiW23-Regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Dubai";
+  src: local("Dubai Medium"), local("Dubai"), url("fonts/DubaiW23-Medium.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "Dubai";
+  src: local("Dubai Medium"), local("Dubai"), url("fonts/DubaiW23-Medium.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: "Dubai";
+  src: local("Dubai Bold"), local("Dubai"), url("fonts/DubaiW23-Bold.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Dubai";
+  src: local("Dubai Bold"), local("Dubai"), url("fonts/DubaiW23-Bold.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 800;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -31,7 +79,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, "Segoe UI", Tahoma, Arial, sans-serif;
+  font-family: "Dubai", "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 button,

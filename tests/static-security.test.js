@@ -50,3 +50,15 @@ test("file protocol guidance is not tied to a temporary development port", funct
 
   assert.equal(app.includes("127.0.0.1:3002"), false);
 });
+
+test("page uses self-hosted Dubai font across the interface", function () {
+  const styles = read("styles.css");
+  const sw = read("sw.js");
+
+  assert.equal(styles.includes("font-family: \"Dubai\""), true);
+  assert.equal(styles.includes("fonts/DubaiW23-Regular.woff2"), true);
+  assert.equal(styles.includes("fonts/DubaiW23-Medium.woff2"), true);
+  assert.equal(styles.includes("fonts/DubaiW23-Bold.woff2"), true);
+  assert.equal(styles.includes("font-family: Inter"), false);
+  assert.equal(sw.includes("./fonts/DubaiW23-Regular.woff2"), true);
+});

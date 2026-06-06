@@ -1,15 +1,19 @@
 "use strict";
 
-var CACHE_NAME = "ocr-app-v6";
+var CACHE_NAME = "ocr-app-v7";
 var APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
+  "./styles.css?v=dubai-font-20260606",
   "./app.js?v=metadata-ui-20260606",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",
   "./icon-512.png",
+  "./fonts/DubaiW23-Light.woff2",
+  "./fonts/DubaiW23-Regular.woff2",
+  "./fonts/DubaiW23-Medium.woff2",
+  "./fonts/DubaiW23-Bold.woff2",
   "./vendor/pdf.min.js",
   "./vendor/pdf.worker.min.js"
 ];

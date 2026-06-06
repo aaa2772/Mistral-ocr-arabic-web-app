@@ -37,6 +37,7 @@ http://localhost:3000
 - Recent history stores only file name, date, and page count. It does not store extracted OCR text.
 - The app sets a strict Content Security Policy and self-hosts PDF.js assets.
 - The server checks the uploaded file signature against the declared MIME type before calling Mistral.
+- The UI uses self-hosted Dubai font files from the local `fonts/` directory, sourced from the ISC-licensed `@ahmedhamdan/dubai-font` web distribution.
 
 ## OCR options
 
