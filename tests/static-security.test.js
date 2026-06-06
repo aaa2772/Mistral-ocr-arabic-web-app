@@ -30,3 +30,23 @@ test("page uses local assets instead of third-party runtime CDNs", function () {
   assert.equal(html.includes("cdn.jsdelivr.net"), false);
   assert.equal(html.includes("vendor/pdf.min.js"), true);
 });
+
+test("results UI exposes metadata panels for OCR quality signals", function () {
+  const app = read("app.js");
+  const html = read("index.html");
+
+  assert.equal(html.includes("id=\"resultSummary\""), true);
+  assert.equal(html.includes("id=\"confidenceDetails\""), true);
+  assert.equal(html.includes("id=\"tableDetails\""), true);
+  assert.equal(html.includes("field-hint"), true);
+  assert.equal(app.includes("renderResultMetadata"), true);
+  assert.equal(app.includes("renderConfidenceDetails"), true);
+  assert.equal(app.includes("renderTableDetails"), true);
+  assert.equal(app.includes("DOMParser"), true);
+});
+
+test("file protocol guidance is not tied to a temporary development port", function () {
+  const app = read("app.js");
+
+  assert.equal(app.includes("127.0.0.1:3002"), false);
+});

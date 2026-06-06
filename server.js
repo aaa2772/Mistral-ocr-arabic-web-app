@@ -229,6 +229,49 @@ function validateUpload(file) {
   if (file.data.length === 0) {
     throw new HttpError(400, "Uploaded file is empty.");
   }
+
+  const detectedType = detectFileType(file.data);
+  if (detectedType !== file.type) {
+    throw new HttpError(415, "File content does not match the selected file type.");
+  }
+}
+
+function detectFileType(data) {
+  if (data.length >= 5 && data.slice(0, 5).toString("ascii") === "%PDF-") {
+    return "application/pdf";
+  }
+
+  if (data.length >= 8 && data.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return "image/png";
+  }
+
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) {
+    return "image/jpeg";
+  }
+
+  if (
+    data.length >= 12 &&
+    data.slice(0, 4).toString("ascii") === "RIFF" &&
+    data.slice(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  if (data.length >= 2 && data.slice(0, 2).toString("ascii") === "BM") {
+    return "image/bmp";
+  }
+
+  if (
+    data.length >= 4 &&
+    (
+      data.slice(0, 4).equals(Buffer.from([0x49, 0x49, 0x2a, 0x00])) ||
+      data.slice(0, 4).equals(Buffer.from([0x4d, 0x4d, 0x00, 0x2a]))
+    )
+  ) {
+    return "image/tiff";
+  }
+
+  return "";
 }
 
 function normalizeMistralError(status, payload) {
@@ -503,6 +546,7 @@ if (require.main === module) {
 module.exports = {
   HttpError,
   buildMistralRequest,
+  detectFileType,
   normalizeMistralError,
   parseMultipartFormData,
   parsePageSelection,

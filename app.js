@@ -16,6 +16,8 @@
   ]);
   const RECENT_KEY = "recent_scans";
   const MAX_RECENT = 10;
+  const MAX_RENDERED_TABLES = 6;
+  const MAX_LOW_CONFIDENCE_WORDS = 8;
 
   const state = {
     currentFile: null,
@@ -37,6 +39,7 @@
     cacheElements();
     bindEvents();
     renderRecentScans();
+    clearResultMetadata();
     updatePageControls();
   }
 
@@ -65,7 +68,11 @@
       "toastContainer",
       "pagesInput",
       "tableFormatSelect",
-      "confidenceSelect"
+      "confidenceSelect",
+      "resultDetails",
+      "resultSummary",
+      "confidenceDetails",
+      "tableDetails"
     ].forEach(function (id) {
       els[id] = document.getElementById(id);
     });
@@ -134,7 +141,7 @@
 
   function handleFile(file) {
     if (window.location.protocol === "file:") {
-      showToast("افتح التطبيق من الخادم المحلي أولا: http://127.0.0.1:3002/ ثم ارفع الملف.", "error");
+      showToast("شغل الخادم المحلي عبر npm start ثم افتح http://localhost:3000 أو المنفذ الذي يظهر في الطرفية.", "error");
       resetFileInputs();
       return;
     }
@@ -167,6 +174,7 @@
     setProcessing(true, "جاري رفع الملف ومعالجته");
     els.resultsSection.classList.remove("active");
     els.editorContent.replaceChildren();
+    clearResultMetadata();
 
     try {
       const formData = new FormData();
@@ -350,7 +358,330 @@
     els.editorContent.replaceChildren(renderMarkdownFragment(markdown));
     els.editorContent.dir = "auto";
     normalizeEditorLinks();
+    renderResultMetadata(data);
     els.resultsSection.classList.add("active");
+  }
+
+  function clearResultMetadata() {
+    els.resultDetails.hidden = true;
+    els.resultSummary.replaceChildren();
+    els.confidenceDetails.replaceChildren();
+    els.tableDetails.replaceChildren();
+  }
+
+  function renderResultMetadata(data) {
+    const pages = Array.isArray(data.pages) ? data.pages : [];
+    const tables = collectTables(data);
+    const confidenceRows = collectConfidenceScores(pages);
+
+    els.resultSummary.replaceChildren(
+      createSummaryMetric("الصفحات", String(pages.length), "عدد الصفحات التي عالجها OCR"),
+      createSummaryMetric("الجداول", String(tables.length), tables.length ? "جداول منفصلة رجعت من Mistral" : "لا توجد جداول منفصلة"),
+      createSummaryMetric("الثقة", confidenceRows.length ? "متاحة" : "غير متاحة", confidenceRows.length ? "تم عرض درجات الثقة أدناه" : "اختر مستوى الثقة قبل الرفع لعرضها")
+    );
+
+    renderConfidenceDetails(confidenceRows);
+    renderTableDetails(tables);
+    els.resultDetails.hidden = false;
+  }
+
+  function createSummaryMetric(label, value, hint) {
+    const item = document.createElement("div");
+    item.className = "summary-metric";
+
+    const labelEl = document.createElement("span");
+    labelEl.className = "metric-label";
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement("strong");
+    valueEl.textContent = value;
+
+    const hintEl = document.createElement("span");
+    hintEl.className = "metric-hint";
+    hintEl.textContent = hint;
+
+    item.appendChild(labelEl);
+    item.appendChild(valueEl);
+    item.appendChild(hintEl);
+    return item;
+  }
+
+  function collectTables(data) {
+    const tables = [];
+    const pages = Array.isArray(data.pages) ? data.pages : [];
+
+    addTables(data.tables, null);
+    pages.forEach(function (page, index) {
+      addTables(page && page.tables, index + 1);
+    });
+
+    function addTables(source, pageNumber) {
+      if (!Array.isArray(source)) {
+        return;
+      }
+      source.forEach(function (table, index) {
+        const normalized = normalizeTable(table, pageNumber, index + 1);
+        if (normalized) {
+          tables.push(normalized);
+        }
+      });
+    }
+
+    return tables;
+  }
+
+  function normalizeTable(table, pageNumber, position) {
+    const title = pageNumber ? "صفحة " + pageNumber + " · جدول " + position : "جدول " + position;
+
+    if (typeof table === "string") {
+      return { title: title, format: "text", content: table };
+    }
+
+    if (!table || typeof table !== "object") {
+      return null;
+    }
+
+    if (typeof table.markdown === "string") {
+      return { title: table.title || title, format: "markdown", content: table.markdown };
+    }
+
+    if (typeof table.html === "string") {
+      return { title: table.title || title, format: "html", content: table.html };
+    }
+
+    if (typeof table.content === "string") {
+      return { title: table.title || title, format: table.format || "text", content: table.content };
+    }
+
+    return { title: table.title || title, format: "json", content: JSON.stringify(table, null, 2) };
+  }
+
+  function renderConfidenceDetails(confidenceRows) {
+    els.confidenceDetails.replaceChildren();
+    els.confidenceDetails.appendChild(createDetailTitle("الثقة", confidenceRows.length ? "درجات الثقة حسب الصفحة" : "لم ترجع درجات ثقة"));
+
+    if (!confidenceRows.length) {
+      els.confidenceDetails.appendChild(createDetailEmpty("اختر مستوى الصفحة أو الكلمة قبل رفع الملف لعرض هذه البيانات."));
+      return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "confidence-list";
+    confidenceRows.forEach(function (row) {
+      const item = document.createElement("article");
+      item.className = "confidence-item";
+
+      const header = document.createElement("div");
+      header.className = "confidence-header";
+      const title = document.createElement("strong");
+      title.textContent = "صفحة " + row.page;
+      const score = document.createElement("span");
+      score.textContent = row.average === null ? "متوسط غير متاح" : "متوسط " + formatPercent(row.average);
+      header.appendChild(title);
+      header.appendChild(score);
+
+      const bar = document.createElement("div");
+      bar.className = "confidence-bar";
+      const fill = document.createElement("span");
+      fill.style.width = row.average === null ? "0%" : formatPercent(row.average);
+      bar.appendChild(fill);
+
+      const meta = document.createElement("p");
+      meta.textContent = row.minimum === null ? "أدنى ثقة غير متاحة." : "أدنى ثقة: " + formatPercent(row.minimum) + ".";
+
+      item.appendChild(header);
+      item.appendChild(bar);
+      item.appendChild(meta);
+
+      if (row.words.length) {
+        const words = document.createElement("div");
+        words.className = "word-score-list";
+        row.words.slice(0, MAX_LOW_CONFIDENCE_WORDS).forEach(function (word) {
+          const chip = document.createElement("span");
+          chip.textContent = word.text + " · " + formatPercent(word.score);
+          words.appendChild(chip);
+        });
+        item.appendChild(words);
+      }
+
+      list.appendChild(item);
+    });
+    els.confidenceDetails.appendChild(list);
+  }
+
+  function collectConfidenceScores(pages) {
+    const rows = [];
+    pages.forEach(function (page, index) {
+      const source = page && (page.confidence_scores || page.confidenceScores || page.confidence);
+      if (!source || typeof source !== "object") {
+        return;
+      }
+
+      const average = readScore(source.average_page_confidence_score, source.averagePageConfidenceScore, source.average, source.avg);
+      const minimum = readScore(source.minimum_page_confidence_score, source.minimumPageConfidenceScore, source.minimum, source.min);
+      const words = normalizeWordScores(source.word_confidence_scores || source.wordConfidenceScores || source.words || []);
+
+      rows.push({
+        page: Number.isFinite(Number(page.index)) ? Number(page.index) + 1 : index + 1,
+        average: average,
+        minimum: minimum,
+        words: words
+      });
+    });
+    return rows;
+  }
+
+  function normalizeWordScores(words) {
+    if (!Array.isArray(words)) {
+      return [];
+    }
+    return words.map(function (entry) {
+      if (Array.isArray(entry)) {
+        return { text: String(entry[0] || ""), score: readScore(entry[1]) };
+      }
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+      return {
+        text: String(entry.word || entry.text || entry.value || "").slice(0, 48),
+        score: readScore(entry.confidence_score, entry.confidenceScore, entry.confidence, entry.score)
+      };
+    }).filter(function (entry) {
+      return entry && entry.text && entry.score !== null;
+    }).sort(function (a, b) {
+      return a.score - b.score;
+    });
+  }
+
+  function readScore() {
+    for (let index = 0; index < arguments.length; index += 1) {
+      const value = Number(arguments[index]);
+      if (Number.isFinite(value)) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  function formatPercent(value) {
+    const percent = value <= 1 ? value * 100 : value;
+    return Math.max(0, Math.min(100, percent)).toFixed(1).replace(/\.0$/, "") + "%";
+  }
+
+  function renderTableDetails(tables) {
+    els.tableDetails.replaceChildren();
+    els.tableDetails.appendChild(createDetailTitle("الجداول", tables.length ? tables.length + " جدول منفصل" : "لم ترجع جداول منفصلة"));
+
+    if (!tables.length) {
+      els.tableDetails.appendChild(createDetailEmpty("اختيار Markdown أو HTML معقم يساعد على عرض الجداول هنا عندما يرجعها مزود OCR."));
+      return;
+    }
+
+    tables.slice(0, MAX_RENDERED_TABLES).forEach(function (table) {
+      const item = document.createElement("article");
+      item.className = "extracted-table";
+
+      const heading = document.createElement("h3");
+      heading.textContent = table.title;
+
+      const body = document.createElement("div");
+      body.className = "extracted-table-body editor-content";
+      body.contentEditable = "false";
+
+      if (table.format === "markdown") {
+        body.appendChild(renderMarkdownFragment(table.content));
+      } else if (table.format === "html") {
+        body.appendChild(renderSafeHtmlFragment(table.content));
+      } else {
+        const pre = document.createElement("pre");
+        pre.textContent = table.content;
+        body.appendChild(pre);
+      }
+
+      item.appendChild(heading);
+      item.appendChild(body);
+      els.tableDetails.appendChild(item);
+    });
+
+    if (tables.length > MAX_RENDERED_TABLES) {
+      els.tableDetails.appendChild(createDetailEmpty("تم عرض أول " + MAX_RENDERED_TABLES + " جداول فقط لتجنب ازدحام الواجهة."));
+    }
+  }
+
+  function createDetailTitle(title, subtitle) {
+    const header = document.createElement("div");
+    header.className = "detail-title";
+    const h = document.createElement("h2");
+    h.textContent = title;
+    const p = document.createElement("p");
+    p.textContent = subtitle;
+    header.appendChild(h);
+    header.appendChild(p);
+    return header;
+  }
+
+  function createDetailEmpty(message) {
+    const empty = document.createElement("p");
+    empty.className = "detail-empty";
+    empty.textContent = message;
+    return empty;
+  }
+
+  function renderSafeHtmlFragment(html) {
+    const allowedTags = new Set(["TABLE", "THEAD", "TBODY", "TFOOT", "TR", "TH", "TD", "CAPTION", "P", "BR", "STRONG", "B", "EM", "I", "CODE"]);
+    const fragment = document.createDocumentFragment();
+    const parsed = new DOMParser().parseFromString(String(html || ""), "text/html");
+
+    Array.from(parsed.body.childNodes).forEach(function (node) {
+      const clean = cloneSafeHtmlNode(node, allowedTags);
+      if (clean) {
+        fragment.appendChild(clean);
+      }
+    });
+
+    return fragment;
+  }
+
+  function cloneSafeHtmlNode(node, allowedTags) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.nodeValue || "");
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return null;
+    }
+
+    if (!allowedTags.has(node.tagName)) {
+      const span = document.createElement("span");
+      Array.from(node.childNodes).forEach(function (child) {
+        const clean = cloneSafeHtmlNode(child, allowedTags);
+        if (clean) {
+          span.appendChild(clean);
+        }
+      });
+      return span;
+    }
+
+    const clone = document.createElement(node.tagName.toLowerCase());
+    if (node.tagName === "TH" || node.tagName === "TD") {
+      copyPositiveIntegerAttribute(node, clone, "colspan");
+      copyPositiveIntegerAttribute(node, clone, "rowspan");
+    }
+
+    Array.from(node.childNodes).forEach(function (child) {
+      const clean = cloneSafeHtmlNode(child, allowedTags);
+      if (clean) {
+        clone.appendChild(clean);
+      }
+    });
+    return clone;
+  }
+
+  function copyPositiveIntegerAttribute(source, target, name) {
+    const value = Number(source.getAttribute(name));
+    if (Number.isInteger(value) && value > 0 && value <= 20) {
+      target.setAttribute(name, String(value));
+    }
   }
 
   function renderMarkdownFragment(markdown) {

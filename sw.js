@@ -1,11 +1,11 @@
 "use strict";
 
-var CACHE_NAME = "ocr-app-v5";
+var CACHE_NAME = "ocr-app-v6";
 var APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
-  "./app.js?v=server-required-20260605",
+  "./app.js?v=metadata-ui-20260606",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",

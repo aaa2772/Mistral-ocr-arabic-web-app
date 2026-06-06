@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="OCR App">
 <link rel="stylesheet" href="styles.css">
 <script src="vendor/pdf.min.js"></script>
-<script src="app.js?v=server-required-20260605" defer></script>
+<script src="app.js?v=metadata-ui-20260606" defer></script>
 </head>
 <body>
 <header class="header">
@@ -60,24 +60,27 @@
 
   <section class="options-panel" aria-label="خيارات OCR">
     <label>
-      الصفحات
-      <input id="pagesInput" type="text" inputmode="numeric" placeholder="الكل أو 1,3-5" autocomplete="off">
+      <span class="field-label">الصفحات</span>
+      <input id="pagesInput" type="text" inputmode="numeric" placeholder="الكل أو 1,3-5" autocomplete="off" aria-describedby="pagesHint">
+      <span class="field-hint" id="pagesHint">اتركها فارغة لمعالجة كل الصفحات.</span>
     </label>
     <label>
-      الجداول
-      <select id="tableFormatSelect">
+      <span class="field-label">الجداول</span>
+      <select id="tableFormatSelect" aria-describedby="tablesHint">
         <option value="">داخل النص</option>
         <option value="markdown">Markdown</option>
-        <option value="html">HTML آمن</option>
+        <option value="html">HTML معقم</option>
       </select>
+      <span class="field-hint" id="tablesHint">اختر تنسيقا منفصلا عند الحاجة لفحص الجداول.</span>
     </label>
     <label>
-      الثقة
-      <select id="confidenceSelect">
+      <span class="field-label">الثقة</span>
+      <select id="confidenceSelect" aria-describedby="confidenceHint">
         <option value="">بدون</option>
         <option value="page">على مستوى الصفحة</option>
         <option value="word">على مستوى الكلمة</option>
       </select>
+      <span class="field-hint" id="confidenceHint">مستوى الكلمة أدق لكنه يزيد حجم الاستجابة.</span>
     </label>
   </section>
 
@@ -149,6 +152,13 @@
         <div class="editor-content" id="editorContent" contenteditable="true" spellcheck="false" dir="auto" aria-label="النص المستخرج والقابل للتحرير"></div>
       </section>
     </div>
+    <section class="result-details" id="resultDetails" aria-label="تفاصيل نتيجة OCR" hidden>
+      <div class="result-summary" id="resultSummary"></div>
+      <div class="detail-grid">
+        <section class="detail-panel" id="confidenceDetails" aria-label="تفاصيل الثقة"></section>
+        <section class="detail-panel" id="tableDetails" aria-label="الجداول المستخرجة"></section>
+      </div>
+    </section>
   </section>
 
   <section class="recent-scans" id="recentScansSection" aria-labelledby="recentTitle">

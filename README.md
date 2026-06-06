@@ -36,12 +36,15 @@ http://localhost:3000
 - OCR Markdown is rendered with a small safe renderer that does not execute raw HTML.
 - Recent history stores only file name, date, and page count. It does not store extracted OCR text.
 - The app sets a strict Content Security Policy and self-hosts PDF.js assets.
+- The server checks the uploaded file signature against the declared MIME type before calling Mistral.
 
 ## OCR options
 
 - `pages`: optional, user-facing 1-based pages such as `1,3-5`; the server converts them to the Mistral API's 0-based page indexes.
 - `tableFormat`: optional `markdown` or `html`.
 - `confidence`: optional `page` or `word`.
+
+When Mistral returns separate table or confidence metadata, the app shows it in the result details panel below the editable OCR text.
 
 ## Tests
 

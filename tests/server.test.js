@@ -42,6 +42,22 @@ test("validateUpload accepts supported file and rejects unsafe input", function 
   }, /Unsupported file type/);
 });
 
+test("validateUpload rejects files whose bytes do not match the declared type", function () {
+  assert.throws(function () {
+    validateUpload({
+      type: "application/pdf",
+      data: Buffer.from("<html>not a pdf</html>")
+    });
+  }, /content does not match/);
+
+  assert.throws(function () {
+    validateUpload({
+      type: "image/png",
+      data: Buffer.from("plain text")
+    });
+  }, /content does not match/);
+});
+
 test("parseMultipartFormData extracts fields and file safely", function () {
   const boundary = "----ocr-boundary";
   const body = Buffer.from([
